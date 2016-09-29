@@ -1,4 +1,6 @@
-<?php namespace ReadmeGen\Log;
+<?php
+
+namespace ReadmeGen\Log;
 
 /**
  * Log extractor.
@@ -41,8 +43,7 @@ class Extractor {
      * @param array $log
      * @return $this
      */
-    public function setLog(array $log)
-    {
+    public function setLog(array $log) {
         $this->log = $log;
 
         return $this;
@@ -54,13 +55,12 @@ class Extractor {
      * @param array $messageGroups
      * @return $this
      */
-    public function setMessageGroups(array $messageGroups)
-    {
+    public function setMessageGroups(array $messageGroups) {
         $this->messageGroups = $messageGroups;
 
         // Set the joined message groups as well
         foreach ($this->messageGroups as $header => $keywords) {
-            $this->messageGroupsJoined[$header] = join('|', $keywords);
+            $this->messageGroupsJoined[$header] = is_array($keywords) ? join('|', $keywords) : null;
         }
 
         return $this;
@@ -73,12 +73,24 @@ class Extractor {
      */
     public function extract() {
         foreach ($this->log as $line) {
+            $isAdded = false;
+            $blankGroup = null;
             foreach ($this->messageGroupsJoined as $header => $keywords) {
+                if ($keywords === null) {
+                    $blankGroup = $header;
+                    continue;
+                }
+
                 $pattern = $this->getPattern($keywords);
 
                 if (preg_match($pattern, $line)) {
                     $this->appendToGroup($header, $line, $pattern);
+                    $isAdded = true;
                 }
+            }
+
+            if ($isAdded === false && $blankGroup !== null) {
+                $this->appendToGroup($blankGroup, $line, null);
             }
         }
 
@@ -101,7 +113,10 @@ class Extractor {
      * @param string $pattern
      */
     protected function appendToGroup($groupHeader, $text, $pattern) {
-        $this->groups[$groupHeader][] = trim(preg_replace($pattern, '', $text));
+        $this->groups[$groupHeader][] = $pattern !== null ?
+                trim(preg_replace($pattern, '', $text)) :
+                trim($text)
+        ;
     }
 
     /**
@@ -111,6 +126,7 @@ class Extractor {
      * @return string
      */
     protected function getPattern($keywords) {
-        return '/^('.$keywords.'):/i';
+        return '/^(' . $keywords . '):/i';
     }
+
 }
